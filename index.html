@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HostelSync — Leave & Attendance</title>
+<style>
+  :root{
+    --glass-bg: rgba(255,255,255,0.10);
+    --glass-bg-strong: rgba(255,255,255,0.16);
+    --glass-border: rgba(255,255,255,0.35);
+    --glass-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    --accent: #0A84FF;
+    --accent-2: #64D2FF;
+    --good: #32D74B;
+    --warn: #FF9F0A;
+    --bad: #FF453A;
+    --text: #F5F7FA;
+    --text-dim: rgba(245,247,250,0.68);
+    --radius: 22px;
+    --radius-sm: 14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+    background: #0b1024;
+  }
+
+  /* animated liquid background */
+  .bg{
+    position:fixed; inset:0; z-index:-1; overflow:hidden;
+    background: linear-gradient(160deg,#0b1024 0%, #131a3a 45%, #1a1240 100%);
+  }
+  .blob{
+    position:absolute; border-radius:50%; filter: blur(70px); opacity:0.55;
+    animation: float 22s ease-in-out infinite;
+  }
+  .blob1{ width:520px; height:520px; background: radial-gradient(circle at 30% 30%, #0A84FF, transparent 70%); top:-120px; left:-120px; animation-duration:26s;}
+  .blob2{ width:480px; height:480px; background: radial-gradient(circle at 60% 40%, #BF5AF2, transparent 70%); bottom:-160px; right:-100px; animation-duration:30s; animation-delay:-6s;}
+  .blob3{ width:420px; height:420px; background: radial-gradient(circle at 50% 50%, #64D2FF, transparent 70%); bottom:10%; left:15%; animation-duration:24s; animation-delay:-12s;}
+  @keyframes float{
+    0%,100%{ transform: translate(0,0) scale(1); }
+    33%{ transform: translate(40px,-30px) scale(1.08); }
+    66%{ transform: translate(-30px,20px) scale(0.95); }
+  }
+
+  .app{ max-width:1100px; margin:0 auto; padding:28px 20px 60px; }
+
+  /* Glass card base */
+  .glass{
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px; margin-bottom:22px;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:19px; letter-spacing:-0.02em;}
+  .brand .dot{ width:11px; height:11px; border-radius:50%; background: linear-gradient(135deg,var(--accent-2),var(--accent)); box-shadow:0 0 14px var(--accent);}
+  .who{ display:flex; align-items:center; gap:12px; font-size:14px; color:var(--text-dim);}
+  .who b{ color:var(--text); }
+  .btn{
+    appearance:none; border:1px solid var(--glass-border); cursor:pointer;
+    background: var(--glass-bg-strong); color:var(--text);
+    padding:9px 16px; border-radius: 999px; font-size:14px; font-weight:600;
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    transition: transform .15s ease, background .15s ease;
+  }
+  .btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,0.24); }
+  .btn:active{ transform: translateY(0); }
+  .btn-primary{ background: linear-gradient(135deg, var(--accent), #3f8cff); border:none; box-shadow:0 6px 18px rgba(10,132,255,0.45);}
+  .btn-good{ background: linear-gradient(135deg,#32D74B,#28b83f); border:none;}
+  .btn-bad{ background: linear-gradient(135deg,#FF453A,#e0342a); border:none;}
+  .btn-ghost{ background: transparent; }
+  .btn:disabled{ opacity:0.45; cursor:not-allowed; transform:none;}
+
+  /* ---------- Login ---------- */
+  .login-wrap{ min-height:82vh; display:flex; align-items:center; justify-content:center; }
+  .login-card{ width:100%; max-width:420px; padding:36px 32px; text-align:center;}
+  .login-card h1{ font-size:26px; letter-spacing:-0.02em; margin-bottom:6px;}
+  .login-card p{ color:var(--text-dim); font-size:14px; margin-bottom:26px;}
+  .role-toggle{ display:flex; gap:8px; background:rgba(255,255,255,0.08); padding:5px; border-radius:999px; margin-bottom:22px; border:1px solid var(--glass-border);}
+  .role-toggle button{ flex:1; padding:9px 0; border:none; border-radius:999px; background:transparent; color:var(--text-dim); font-weight:600; font-size:14px; cursor:pointer; transition:.2s;}
+  .role-toggle button.active{ background: linear-gradient(135deg,var(--accent),#3f8cff); color:#fff; box-shadow:0 4px 14px rgba(10,132,255,0.4);}
+  .field{ text-align:left; margin-bottom:14px; }
+  .field label{ display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px; font-weight:600;}
+  .field input, .field select, .field textarea{
+    width:100%; padding:12px 14px; border-radius: var(--radius-sm); border:1px solid var(--glass-border);
+    background: rgba(255,255,255,0.08); color:var(--text); font-size:15px; outline:none;
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .field input::placeholder, .field textarea::placeholder{ color:rgba(245,247,250,0.4); }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color: var(--accent); box-shadow:0 0 0 3px rgba(10,132,255,0.25);}
+  .hint{ font-size:12px; color:var(--text-dim); margin-top:14px; line-height:1.5;}
+
+  /* ---------- Layout tabs ---------- */
+  .tabs{ display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; padding:6px; }
+  .tab{
+    padding:10px 18px; border-radius:999px; cursor:pointer; font-size:14px; font-weight:600;
+    color:var(--text-dim); border:1px solid transparent; transition:.15s;
+  }
+  .tab.active{ color:#fff; background: var(--glass-bg-strong); border-color:var(--glass-border); box-shadow: 0 4px 14px rgba(0,0,0,0.2);}
+  .tab:hover:not(.active){ color:var(--text); }
+
+  .grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px; margin-bottom:20px;}
+  .stat{ padding:20px; }
+  .stat .num{ font-size:30px; font-weight:700; letter-spacing:-0.02em;}
+  .stat .label{ font-size:13px; color:var(--text-dim); margin-top:4px;}
+
+  .panel{ padding:24px; margin-bottom:20px; }
+  .panel h2{ font-size:17px; margin-bottom:16px; letter-spacing:-0.01em; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+  .panel h2 span.sub{ font-size:12.5px; color:var(--text-dim); font-weight:500;}
+
+  table{ width:100%; border-collapse:collapse; font-size:14px;}
+  th{ text-align:left; color:var(--text-dim); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:0.04em; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.15);}
+  td{ padding:11px 10px; border-bottom:1px solid rgba(255,255,255,0.08); vertical-align:middle;}
+  tr:last-child td{ border-bottom:none;}
+
+  .badge{ display:inline-block; padding:4px 11px; border-radius:999px; font-size:12px; font-weight:700; letter-spacing:0.01em;}
+  .badge.present{ background: rgba(50,215,75,0.18); color:#32D74B; }
+  .badge.absent{ background: rgba(255,69,58,0.18); color:#FF453A; }
+  .badge.pending{ background: rgba(255,159,10,0.18); color:#FF9F0A; }
+  .badge.approved{ background: rgba(50,215,75,0.18); color:#32D74B; }
+  .badge.rejected{ background: rgba(255,69,58,0.18); color:#FF453A; }
+
+  .row-actions{ display:flex; gap:8px; }
+  .empty{ text-align:center; padding:30px 10px; color:var(--text-dim); font-size:14px;}
+  .form-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:14px;}
+  .form-grid .full{ grid-column: 1 / -1; }
+  @media (max-width:600px){ .form-grid{ grid-template-columns:1fr; } }
+
+  .toast{
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
+    padding:13px 22px; border-radius:999px; font-size:14px; font-weight:600;
+    opacity:0; pointer-events:none; transition: all .35s ease; z-index:999;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .hidden{ display:none !important; }
+  footer{ text-align:center; color:var(--text-dim); font-size:12px; margin-top:30px; padding-bottom:10px;}
+</style>
+</head>
+<body>
+
+<div class="bg">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+</div>
+
+<div class="app" id="app"></div>
+<div class="toast glass" id="toast"></div>
+
+<script>
+/* ============ DATA LAYER (REST API) ============ */
+const API = location.origin.startsWith('http') ? location.origin + '/api' : 'http://127.0.0.1:5000/api';
+
+let token = localStorage.getItem('hs_token') || null;
+let cache = {};   // whatever /api/bootstrap returned for the signed-in user
+
+async function api(path, {method='GET', body}={}){
+  const res = await fetch(API + path, {
+    method,
+    headers: Object.assign(
+      body ? {'Content-Type':'application/json'} : {},
+      token ? {'Authorization':'Bearer ' + token} : {}
+    ),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let data = {};
+  try{ data = await res.json(); }catch(e){}
+  if(res.status === 401 && token){ token = null; localStorage.removeItem('hs_token'); state.user = null; }
+  if(!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+  return data;
+}
+
+const state = {
+  user: null,                 // {type:'student'|'warden', ...}
+  tab: 'attendance',
+  loginRole: 'student'
+};
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmt(d){ return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function uid(){ return 'L'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+function toast(msg, kind){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.color = kind==='bad' ? '#FF453A' : kind==='good' ? '#32D74B' : '#F5F7FA';
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=> t.classList.remove('show'), 2400);
+}
+
+/* ============ RENDER ROOT ============ */
+function render(){
+  const app = document.getElementById('app');
+  if(!state.user){ app.innerHTML = loginView(); attachLoginEvents(); return; }
+  app.innerHTML = shellView();
+  attachShellEvents();
+}
+
+/* Pull fresh data from the server, then re-render. */
+async function refresh(){
+  if(!token){ state.user = null; render(); return; }
+  try{
+    cache = await api('/bootstrap');
+    state.user = cache.user;
+  }catch(err){
+    cache = {}; state.user = null;
+    if(token) toast(err.message, 'bad');
+  }
+  render();
+}
+
+async function boot(){
+  document.getElementById('app').innerHTML =
+    '<div class="login-wrap"><div class="glass login-card"><h1>HostelSync</h1><p>Connecting…</p></div></div>';
+  await refresh();
+}
+
+/* ============ LOGIN VIEW ============ */
+function loginView(){
+  return `
+  <div class="login-wrap">
+    <div class="glass login-card">
+      <h1>HostelSync</h1>
+      <p>Automated Hostel Leave &amp; Attendance Management</p>
+      <div class="role-toggle">
+        <button data-role="student" class="${state.loginRole==='student'?'active':''}">Student</button>
+        <button data-role="warden" class="${state.loginRole==='warden'?'active':''}">Warden</button>
+      </div>
+
+      ${state.loginRole==='student' ? `
+      <div class="field"><label>Roll Number</label><input id="li-roll" placeholder="e.g. S101" autocomplete="off"></div>
+      <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="Enter password"></div>
+      <button class="btn btn-primary" style="width:100%; padding:13px 0; font-size:15px;" id="li-submit">Sign In</button>
+      <p class="hint">New here? <a href="#" id="show-register" style="color:var(--accent-2); text-decoration:none; font-weight:600;">Register as a student</a><br>Demo: S101 / 1234</p>
+      ` : `
+      <div class="field"><label>Warden ID</label><input id="li-roll" placeholder="e.g. W01" autocomplete="off"></div>
+      <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="Enter password"></div>
+      <button class="btn btn-primary" style="width:100%; padding:13px 0; font-size:15px;" id="li-submit">Sign In</button>
+      <p class="hint">Demo: W01 / admin</p>
+      `}
+    </div>
+  </div>`;
+}
+
+function registerView(){
+  return `
+  <div class="login-wrap">
+    <div class="glass login-card">
+      <h1>Register</h1>
+      <p>Create your student account</p>
+      <div class="field"><label>Full Name</label><input id="rg-name" placeholder="Your name"></div>
+      <div class="field"><label>Roll Number</label><input id="rg-roll" placeholder="e.g. S104"></div>
+      <div class="field"><label>Room Number</label><input id="rg-room" placeholder="e.g. B-212"></div>
+      <div class="field"><label>Password</label><input id="rg-pass" type="password" placeholder="Choose a password"></div>
+      <button class="btn btn-primary" style="width:100%; padding:13px 0; font-size:15px;" id="rg-submit">Create Account</button>
+      <p class="hint"><a href="#" id="back-login" style="color:var(--accent-2); text-decoration:none; font-weight:600;">← Back to sign in</a></p>
+    </div>
+  </div>`;
+}
+
+function attachLoginEvents(){
+  document.querySelectorAll('.role-toggle button').forEach(b=>{
+    b.onclick = ()=>{ state.loginRole = b.dataset.role; render(); };
+  });
+  const submit = document.getElementById('li-submit');
+  if(submit) submit.onclick = doLogin;
+  const passField = document.getElementById('li-pass');
+  if(passField) passField.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+  const showReg = document.getElementById('show-register');
+  if(showReg) showReg.onclick = (e)=>{ e.preventDefault(); document.getElementById('app').innerHTML = registerView(); attachRegisterEvents(); };
+}
+
+function attachRegisterEvents(){
+  document.getElementById('back-login').onclick = (e)=>{ e.preventDefault(); render(); };
+  document.getElementById('rg-submit').onclick = async ()=>{
+    const name = document.getElementById('rg-name').value.trim();
+    const roll = document.getElementById('rg-roll').value.trim().toUpperCase();
+    const room = document.getElementById('rg-room').value.trim();
+    const pass = document.getElementById('rg-pass').value;
+    if(!name||!roll||!room||!pass){ toast('Please fill all fields','bad'); return; }
+    try{
+      const r = await api('/auth/register', {method:'POST', body:{name, roll, room, password:pass}});
+      toast(r.message, 'good');
+      render();
+    }catch(err){ toast(err.message, 'bad'); }
+  };
+}
+
+async function doLogin(){
+  const idVal = document.getElementById('li-roll').value.trim().toUpperCase();
+  const pass = document.getElementById('li-pass').value;
+  const btn = document.getElementById('li-submit');
+  btn.disabled = true;
+  try{
+    const r = await api('/auth/login', {method:'POST', body:{role:state.loginRole, id:idVal, password:pass}});
+    token = r.token;
+    localStorage.setItem('hs_token', token);
+    state.tab = 'attendance';
+    await refresh();
+    toast('Welcome, ' + r.user.name, 'good');
+  }catch(err){
+    toast(err.message, 'bad');
+    btn.disabled = false;
+  }
+}
+
+async function logout(){
+  try{ await api('/auth/logout', {method:'POST'}); }catch(e){}
+  token = null; cache = {}; state.user = null;
+  localStorage.removeItem('hs_token');
+  render();
+}
+
+/* ============ SHELL (post-login) ============ */
+function shellView(){
+  const isStudent = state.user.type==='student';
+  const tabs = isStudent
+    ? [['attendance','Attendance'],['leave','Apply Leave'],['history','My Leave Requests']]
+    : [['attendance','Attendance Overview'],['approve','Leave Requests'],['students','Students']];
+
+  return `
+    <div class="glass topbar">
+      <div class="brand"><span class="dot"></span> HostelSync</div>
+      <div class="who">
+        <span><b>${state.user.name}</b> · ${isStudent ? state.user.roll+' · Room '+state.user.room : 'Warden'}</span>
+        <button class="btn btn-ghost" id="logout-btn">Sign out</button>
+      </div>
+    </div>
+
+    <div class="glass tabs">
+      ${tabs.map(([key,label])=>`<div class="tab ${state.tab===key?'active':''}" data-tab="${key}">${label}</div>`).join('')}
+    </div>
+
+    <div id="tab-content">${isStudent ? studentTabContent() : wardenTabContent()}</div>
+
+    <footer>HostelSync · Academic Mini Project · Automated Student Hostel Leave &amp; Attendance Management System</footer>
+  `;
+}
+
+function attachShellEvents(){
+  document.getElementById('logout-btn').onclick = logout;
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.onclick = ()=>{ state.tab = t.dataset.tab; render(); };
+  });
+  bindTabEvents();
+}
+
+/* ============ STUDENT VIEWS ============ */
+function myAttendance(){ return cache.attendance || []; }   // already sorted by the server
+function myLeaves(){ return cache.leaves || []; }
+
+function studentTabContent(){
+  if(state.tab==='attendance') return studentAttendanceTab();
+  if(state.tab==='leave') return studentLeaveFormTab();
+  if(state.tab==='history') return studentHistoryTab();
+}
+
+function studentAttendanceTab(){
+  const records = myAttendance();
+  const total = records.length;
+  const present = records.filter(r=>r.status==='present').length;
+  const pct = total ? Math.round(present/total*100) : 0;
+  const today = todayStr();
+  const markedToday = records.find(r=>r.date===today);
+
+  return `
+  <div class="grid">
+    <div class="glass stat"><div class="num">${pct}%</div><div class="label">Overall attendance</div></div>
+    <div class="glass stat"><div class="num">${present}</div><div class="label">Days present</div></div>
+    <div class="glass stat"><div class="num">${total-present}</div><div class="label">Days absent</div></div>
+  </div>
+
+  <div class="glass panel">
+    <h2>Today — ${fmt(today)}</h2>
+    ${markedToday
+      ? `<p style="color:var(--text-dim); font-size:14px;">You are marked <span class="badge ${markedToday.status}">${markedToday.status}</span> for today.</p>`
+      : `<div class="row-actions">
+           <button class="btn btn-good" id="mark-present">Mark Present</button>
+           <button class="btn btn-bad" id="mark-absent">Mark Absent</button>
+         </div>`
+    }
+  </div>
+
+  <div class="glass panel">
+    <h2>Attendance history <span class="sub">last ${Math.min(records.length,15)} entries</span></h2>
+    ${records.length===0 ? `<div class="empty">No attendance marked yet.</div>` : `
+    <table><thead><tr><th>Date</th><th>Status</th></tr></thead><tbody>
+      ${records.slice(0,15).map(r=>`<tr><td>${fmt(r.date)}</td><td><span class="badge ${r.status}">${r.status}</span></td></tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+}
+
+function studentLeaveFormTab(){
+  return `
+  <div class="glass panel">
+    <h2>Apply for Leave</h2>
+    <div class="form-grid">
+      <div class="field"><label>From Date</label><input type="date" id="lv-from" min="${todayStr()}"></div>
+      <div class="field"><label>To Date</label><input type="date" id="lv-to" min="${todayStr()}"></div>
+      <div class="field full"><label>Reason</label><textarea id="lv-reason" rows="3" placeholder="Briefly describe the reason for leave"></textarea></div>
+    </div>
+    <button class="btn btn-primary" id="lv-submit">Submit Request</button>
+  </div>`;
+}
+
+function studentHistoryTab(){
+  const leaves = myLeaves();
+  return `
+  <div class="glass panel">
+    <h2>My Leave Requests</h2>
+    ${leaves.length===0 ? `<div class="empty">No leave requests submitted yet.</div>` : `
+    <table><thead><tr><th>Applied</th><th>From</th><th>To</th><th>Reason</th><th>Status</th></tr></thead><tbody>
+      ${leaves.map(l=>`<tr>
+        <td>${fmt(l.appliedOn)}</td><td>${fmt(l.from)}</td><td>${fmt(l.to)}</td>
+        <td style="max-width:220px;">${l.reason}</td>
+        <td><span class="badge ${l.status}">${l.status}</span></td>
+      </tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+}
+
+/* ============ WARDEN VIEWS ============ */
+function wardenTabContent(){
+  if(state.tab==='attendance') return wardenAttendanceTab();
+  if(state.tab==='approve') return wardenApproveTab();
+  if(state.tab==='students') return wardenStudentsTab();
+}
+
+function wardenAttendanceTab(){
+  const t = cache.todayAttendance || {roster:[], summary:{}};
+  const roster = t.roster || [];
+  const s = t.summary || {};
+
+  return `
+  <div class="grid">
+    <div class="glass stat"><div class="num">${s.students||0}</div><div class="label">Total students</div></div>
+    <div class="glass stat"><div class="num">${s.present||0}</div><div class="label">Present today</div></div>
+    <div class="glass stat"><div class="num">${s.notMarked||0}</div><div class="label">Not marked today</div></div>
+    <div class="glass stat"><div class="num">${s.pendingLeaves||0}</div><div class="label">Pending leave requests</div></div>
+  </div>
+  <div class="glass panel">
+    <h2>Today's Attendance <span class="sub">${fmt(t.date || todayStr())}</span></h2>
+    ${roster.length===0 ? `<div class="empty">No students registered.</div>` : `
+    <table><thead><tr><th>Roll No</th><th>Name</th><th>Room</th><th>Status</th></tr></thead><tbody>
+      ${roster.map(r=>`<tr><td>${r.roll}</td><td>${r.name}</td><td>${r.room}</td>
+          <td>${r.status ? `<span class="badge ${r.status}">${r.status}</span>` : `<span class="badge pending">not marked</span>`}</td></tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+}
+
+function wardenApproveTab(){
+  const leaves = cache.leaves || [];   // server sorts pending first
+  return `
+  <div class="glass panel">
+    <h2>Leave Requests</h2>
+    ${leaves.length===0 ? `<div class="empty">No leave requests yet.</div>` : `
+    <table><thead><tr><th>Student</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody>
+      ${leaves.map(l=>`<tr>
+        <td>${l.name}<br><span style="color:var(--text-dim); font-size:12px;">${l.roll}</span></td>
+        <td>${fmt(l.from)}</td><td>${fmt(l.to)}</td>
+        <td style="max-width:220px;">${l.reason}</td>
+        <td><span class="badge ${l.status}">${l.status}</span></td>
+        <td>
+          ${l.status==='pending' ? `
+            <div class="row-actions">
+              <button class="btn btn-good" data-approve="${l.id}">Approve</button>
+              <button class="btn btn-bad" data-reject="${l.id}">Reject</button>
+            </div>` : `<span style="color:var(--text-dim); font-size:12px;">—</span>`}
+        </td>
+      </tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+}
+
+function wardenStudentsTab(){
+  const students = cache.students || [];
+  return `
+  <div class="glass panel">
+    <h2>Registered Students <span class="sub">${students.length} total</span></h2>
+    ${students.length===0 ? `<div class="empty">No students registered.</div>` : `
+    <table><thead><tr><th>Roll No</th><th>Name</th><th>Room</th><th>Attendance %</th></tr></thead><tbody>
+      ${students.map(s=>`<tr><td>${s.roll}</td><td>${s.name}</td><td>${s.room}</td><td>${s.percent}%</td></tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+}
+
+/* ============ TAB EVENT BINDING ============ */
+function bindTabEvents(){
+  // Student: mark attendance
+  const mp = document.getElementById('mark-present');
+  const ma = document.getElementById('mark-absent');
+  if(mp) mp.onclick = ()=> markAttendance('present');
+  if(ma) ma.onclick = ()=> markAttendance('absent');
+
+  // Student: submit leave
+  const lvSubmit = document.getElementById('lv-submit');
+  if(lvSubmit) lvSubmit.onclick = submitLeave;
+
+  // Warden: approve/reject
+  document.querySelectorAll('[data-approve]').forEach(b=> b.onclick = ()=> decideLeave(b.dataset.approve,'approved'));
+  document.querySelectorAll('[data-reject]').forEach(b=> b.onclick = ()=> decideLeave(b.dataset.reject,'rejected'));
+}
+
+async function markAttendance(status){
+  try{
+    const r = await api('/attendance', {method:'POST', body:{status}});
+    await refresh();
+    toast(r.message, status==='present'?'good':'bad');
+  }catch(err){ toast(err.message, 'bad'); }
+}
+
+async function submitLeave(){
+  const from = document.getElementById('lv-from').value;
+  const to = document.getElementById('lv-to').value;
+  const reason = document.getElementById('lv-reason').value.trim();
+  if(!from || !to || !reason){ toast('Please fill all fields','bad'); return; }
+  const btn = document.getElementById('lv-submit');
+  btn.disabled = true;
+  try{
+    const r = await api('/leaves', {method:'POST', body:{from, to, reason}});
+    state.tab = 'history';
+    await refresh();
+    toast(r.message, 'good');
+  }catch(err){ toast(err.message, 'bad'); btn.disabled = false; }
+}
+
+async function decideLeave(id, decision){
+  try{
+    const r = await api('/leaves/' + id, {method:'PATCH', body:{status:decision}});
+    await refresh();
+    toast(r.message, decision==='approved'?'good':'bad');
+  }catch(err){ toast(err.message, 'bad'); }
+}
+
+boot();
+</script>
+</body>
+</html>
